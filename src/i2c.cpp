@@ -23,7 +23,9 @@
 #include "opcua_i2c.h"
 #include <functional>
 #include "mldsa.h"
-#include "fips202.h"
+extern "C" {
+    #include "fips202.h"
+}
 #include <boost/algorithm/clamp.hpp>
 
 using namespace std::literals; // Geting the name more essy of chrono

@@ -34,7 +34,9 @@ set(MLDSA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/source/poly_algo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/stream.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/fips202.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/fips202.c)
+
+#set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ref/source/fips202.cpp PROPERTIES LANGUAGE C)
 
 # Create static libraries for different modes
 add_library(mldsa_mode2 STATIC ${MLDSA_SOURCES})
