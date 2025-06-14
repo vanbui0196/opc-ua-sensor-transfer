@@ -15,12 +15,15 @@
 #include <atomic>
 
 // Utility library
+#include <span>
 #include <chrono>
 #include <iostream>
 #include <sstream>
 #include <iomanip>
 #include "opcua_i2c.h"
 #include <functional>
+#include "mldsa.h"
+#include "fips202.h"
 #include <boost/algorithm/clamp.hpp>
 
 using namespace std::literals; // Geting the name more essy of chrono
@@ -364,9 +367,6 @@ void i2c_reader_thread() {
                     g_I2C_SharedData.lastUpdateTime = current_time;
                     g_I2C_SharedData.rawData_str = tempRawData_str;
                     
-                    // std::cout << "[I2C Thread] Speed reading #" << ++reading_count 
-                    //           << ": " << speed << " at " << ctime(&current_time);
-
                     std::cout << "[I2C thread] Current data: " << tempRawData_str;
                 } else {
                     g_I2C_SharedData.dataValid_b = false;
@@ -416,4 +416,32 @@ bool I2C_Initialize() {
 void I2C_Cleanup() {
     g_running = false;
     std::cout << "I2C module cleanup completed" << std::endl;
+}
+
+/**
+ * @brief Signing the data with Shake 256
+ * 
+ * @param dataIn Data for signing 
+ * @param sigOut Signature of data
+ * @return true Signature is ready
+ * @return false Signature is not ready
+ */
+bool I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut) {
+    // return value to indicate that signing is success
+    bool retVal_b = false;
+
+    // shake init state
+    keccak_state state;
+    shake128_init(&state);
+
+    // shake absorb state
+    shake128_absorb(&state, dataIn.data(), dataIn.size());
+
+    // finalize the shake
+    shake128_finalize(&state);
+
+    // Get the value
+
+    
+
 }

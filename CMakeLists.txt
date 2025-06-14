@@ -41,5 +41,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
                 open62541::open62541                            # -> open62541
                 /usr/lib/aarch64-linux-gnu/libgpiod.so          # -> gpiod
                 Boost::boost                                    # -> Boost
-                mldsa_mode2
+                mldsa_mode2                                     # -> mldsa mode
 )

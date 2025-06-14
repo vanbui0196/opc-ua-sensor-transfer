@@ -19,7 +19,6 @@ typedef struct {
     float currentSpeed;      // current speed value
     time_t lastUpdateTime;   // data and time
     uint8_t signature[4097]; // data which contain the signature
-    uint8_t rawDataBuf_au8[10];
     std::string rawData_str;
 } I2C_SharedData_tst;
 

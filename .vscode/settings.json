@@ -59,6 +59,7 @@
         "istream": "cpp",
         "sstream": "cpp",
         "*.bak": "cpp",
-        "iomanip": "cpp"
+        "iomanip": "cpp",
+        "span": "cpp"
     }
 }

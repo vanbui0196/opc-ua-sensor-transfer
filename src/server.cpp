@@ -28,20 +28,20 @@
  * NODE ID GLOBAL
  ********************************************************************************/
 UA_NodeId OpcUa_SpeedSensorObjId_st;
-UA_NodeId OpcUa_sensorRawData_NodeIdSt;
 UA_NodeId OpcUa_sensorSignatureId_NodeIdSt;
 UA_NodeId OpcUa_sensorSpeedValue_NodeIdSt;
 UA_NodeId OpcUa_sensorTimestamp_NodeIdSt;
+UA_NodeId OpcUa_rawData_String_NodeIdSt;
 
 /********************************************************************************
  * Global buffer for OPC UA server
  ********************************************************************************/
 typedef struct {
     UA_Boolean dataValid_b;
-    UA_Byte rawDataBuf_au8[OPCUA_SERVER_RAW_DATA_SIZE];
     UA_Byte signatureBuf_au8[OPCUA_SERVER_SIGNATURE_SIZE];
     UA_Float currentSpeed;
     UA_DateTime lastUpdateTime;
+    std::string rawStringData_str;
 } OpcUa_Server_globData_tst;
 
 // Global data structure for OPC UA
@@ -78,16 +78,14 @@ static void updateSensorData(UA_Server *server, void *data) {
             OpcUa_Server_globData_st.currentSpeed = i2cData.currentSpeed;
             OpcUa_Server_globData_st.lastUpdateTime = UA_DateTime_fromUnixTime(i2cData.lastUpdateTime);
             
-            // Copy raw data buffer
-            memcpy(OpcUa_Server_globData_st.rawDataBuf_au8, 
-                   i2cData.rawDataBuf_au8, 
-                   OPCUA_SERVER_RAW_DATA_SIZE);
-            
-            // Generate signature data (simulated cryptographic signature)
+            // Coppy the signature from I2C module
             for(size_t i = 0; i < OPCUA_SERVER_SIGNATURE_SIZE; i++) {
                 OpcUa_Server_globData_st.signatureBuf_au8[i] = 
                     (UA_Byte)((i + (int)(i2cData.currentSpeed * 100)) % 256);
             }
+
+            // Adding the value to string
+            OpcUa_Server_globData_st.rawStringData_str = i2cData.rawData_str;
         } else {
             OpcUa_Server_globData_st.dataValid_b = UA_FALSE;
         }
@@ -95,13 +93,6 @@ static void updateSensorData(UA_Server *server, void *data) {
     
     // Update OPC UA nodes
     if (hasValidData) {
-        // Update raw data node
-        UA_Variant rawDataValue;
-        UA_Variant_setArray(&rawDataValue, 
-                           OpcUa_Server_globData_st.rawDataBuf_au8, 
-                           OPCUA_SERVER_RAW_DATA_SIZE, 
-                           &UA_TYPES[UA_TYPES_BYTE]);
-        UA_Server_writeValue(server, OpcUa_sensorRawData_NodeIdSt, rawDataValue);
         
         // Update signature data node
         UA_Variant signatureValue;
@@ -120,7 +111,14 @@ static void updateSensorData(UA_Server *server, void *data) {
         UA_Variant timestampValue;
         UA_Variant_setScalar(&timestampValue, &OpcUa_Server_globData_st.lastUpdateTime, &UA_TYPES[UA_TYPES_DATETIME]);
         UA_Server_writeValue(server, OpcUa_sensorTimestamp_NodeIdSt, timestampValue);
-        
+
+        // Sensor data + time stamp
+        UA_Variant rawStringValue;
+        UA_String rawStringCpy_uaStr = UA_STRING_ALLOC(OpcUa_Server_globData_st.rawStringData_str.c_str());
+        UA_Variant_setScalar(&rawStringValue, &rawStringCpy_uaStr, &UA_TYPES[UA_TYPES_STRING]);
+        UA_Server_writeValue(server, OpcUa_rawData_String_NodeIdSt, rawStringValue);
+
+        // Log the data
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
                     "Updated sensor data: Speed=%.2f rpm, Valid=%s", 
                     OpcUa_Server_globData_st.currentSpeed,
@@ -256,7 +254,7 @@ int main(int argc, char** argv) {
     UA_VariableAttributes timestampAttribute_st = UA_VariableAttributes_default;
     UA_DateTime initialTime = UA_DateTime_now();
     UA_Variant_setScalar(&timestampAttribute_st.value, &initialTime, &UA_TYPES[UA_TYPES_DATETIME]);
-    timestampAttribute_st.displayName = UA_LOCALIZEDTEXT("en-US", "Last Update Time");
+    timestampAttribute_st.displayName = UA_LOCALIZEDTEXT("en-US", "Time Stamp");
     timestampAttribute_st.description = UA_LOCALIZEDTEXT("en-US", "Timestamp of last sensor reading");
     
     UA_Server_addVariableNode(
@@ -271,29 +269,9 @@ int main(int argc, char** argv) {
         &OpcUa_sensorTimestamp_NodeIdSt
     );
 
-    /* 4. Sensor Raw Data */
-    UA_VariableAttributes sensorRawDataAttribute_st = UA_VariableAttributes_default;
-    sensorRawDataAttribute_st.displayName = UA_LOCALIZEDTEXT("en-US", "Sensor Raw Data");
-    sensorRawDataAttribute_st.description = UA_LOCALIZEDTEXT("en-US", "Raw Data: 2 bytes length + 4 bytes speed + 4 bytes timestamp");
-
-    UA_Byte rawData_u8[OPCUA_SERVER_RAW_DATA_SIZE] = {0};
-    UA_Variant_setArray(&sensorRawDataAttribute_st.value, rawData_u8, OPCUA_SERVER_RAW_DATA_SIZE, &UA_TYPES[UA_TYPES_BYTE]);
-
-    UA_Server_addVariableNode(
-        server,
-        UA_NODEID_NULL,
-        OpcUa_SpeedSensorObjId_st,
-        UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
-        UA_QUALIFIEDNAME(1, "Sensor Raw Data"),
-        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
-        sensorRawDataAttribute_st,
-        NULL,
-        &OpcUa_sensorRawData_NodeIdSt
-    );
-
     /* 5. Sensor Data Signature */
     UA_VariableAttributes sensorSignatureAttribute_st = UA_VariableAttributes_default;
-    sensorSignatureAttribute_st.displayName = UA_LOCALIZEDTEXT("en-US", "Sensor Data Signature");
+    sensorSignatureAttribute_st.displayName = UA_LOCALIZEDTEXT("en-US", "Signature");
     sensorSignatureAttribute_st.description = UA_LOCALIZEDTEXT("en-US", "Cryptographic signature: 2 bytes length + 1 byte type + 8KB signature");
 
     UA_Byte signatureBuffer_u8[OPCUA_SERVER_SIGNATURE_SIZE] = {0};
@@ -310,6 +288,26 @@ int main(int argc, char** argv) {
         NULL,
         &OpcUa_sensorSignatureId_NodeIdSt
     );
+
+    /* 6. String data */
+    UA_VariableAttributes rawStringDataAttr_st = UA_VariableAttributes_default;
+    UA_String uaRawStringInitial_uaStr = UA_STRING("");
+    UA_Variant_setScalar(&rawStringDataAttr_st.value, &uaRawStringInitial_uaStr, &UA_TYPES[UA_TYPES_STRING]);
+    rawStringDataAttr_st.displayName = UA_LOCALIZEDTEXT("en-US", "Sensor Data with Time Stamp");
+    rawStringDataAttr_st.description = UA_LOCALIZEDTEXT("en-US", "Timestamp of last sensor reading");
+    
+    UA_Server_addVariableNode(
+        server,
+        UA_NODEID_NULL,
+        OpcUa_SpeedSensorObjId_st,
+        UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+        UA_QUALIFIEDNAME(1, "String of the data"),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
+        rawStringDataAttr_st,
+        NULL,
+        &OpcUa_rawData_String_NodeIdSt
+    );
+
 
     /************************************************************************************
      * REPEATED CALLBACK SETUP

@@ -1,4 +1,3 @@
-
 # Optional: Build test executable (only if this is standalone or explicitly requested)
 option(MLDSA_BUILD_TESTS "Build MLDSA test executables" OFF)
 
@@ -35,7 +34,7 @@ set(MLDSA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/source/poly_algo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/stream.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/fips202.c)
+    ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/fips202.cpp)
 
 # Create static libraries for different modes
 add_library(mldsa_mode2 STATIC ${MLDSA_SOURCES})
@@ -59,7 +58,7 @@ target_include_directories(mldsa_mode5 PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ref/include>
     $<INSTALL_INTERFACE:include/mldsa>)
 
-# Create aliases for easier usage (must come AFTER the targets are defined)
+# Create aliases for easier usage (optional)
 add_library(mldsa::mode2 ALIAS mldsa_mode2)
 add_library(mldsa::mode3 ALIAS mldsa_mode3)
 add_library(mldsa::mode5 ALIAS mldsa_mode5)
