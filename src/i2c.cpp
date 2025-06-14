@@ -7,12 +7,18 @@
 #include <signal.h>
 #include <time.h>
 #include <string.h>
+
+// Multithread handler library
 #include <thread>
 #include <mutex>
 #include <shared_mutex>
 #include <atomic>
+
+// Utility library
 #include <chrono>
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 #include "opcua_i2c.h"
 #include <functional>
 #include <boost/algorithm/clamp.hpp>
@@ -268,7 +274,13 @@ float read_sensor_data(int file) {
  * External API Functions for OPC UA Server Integration
  ********************************************************************************/
 
-// Function to get current sensor data (thread-safe)
+/**
+ * @brief Data for return to the reader
+ * 
+ * @param data 
+ * @return true Data is good for reading
+ * @return false Data is not good engough for reading
+ */
 bool I2C_GetCurrentData(I2C_SharedData_tst& data) {
     // Reading data only, no need to use the exculsive lock
     std::shared_lock<std::shared_mutex> lock(g_dataMutex);
@@ -277,6 +289,12 @@ bool I2C_GetCurrentData(I2C_SharedData_tst& data) {
     return data.dataValid_b;
 }
 
+/**
+ * @brief Check if i2c sensor is initialized or not
+ * 
+ * @return true sensor initialization is finish
+ * @return false sensor initialization is not finish
+ */
 // Function to check if I2C is initialized
 bool I2C_IsInitialized() {
     return g_i2cInitialized;
@@ -330,29 +348,26 @@ void i2c_reader_thread() {
         while (g_running) {
             float speed = read_sensor_data(i2c_fd);
             time_t current_time = time(nullptr);
-            
+
+            // Convert the data from float to string (this is because <format> still not fully support on the GCC12 on Raspberry Pi)
+            std::ostringstream string_stream;
+            string_stream << std::fixed << std::setprecision(2) << speed << " " << ctime(&current_time);
+            std::string tempRawData_str =  string_stream.str();
             // Update global data with thread safety
             {
                 std::unique_lock<std::shared_mutex> lock(g_dataMutex);
                 
                 if (speed >= 0) {
+                    // Update data to global structure
                     g_I2C_SharedData.currentSpeed = speed;
                     g_I2C_SharedData.dataValid_b = true;
                     g_I2C_SharedData.lastUpdateTime = current_time;
+                    g_I2C_SharedData.rawData_str = tempRawData_str;
                     
-                    // Pack speed data into raw data buffer
-                    // First 2 bytes: data length (8 bytes for float + timestamp)
-                    // g_I2C_SharedData.rawDataBuf_au8[0] = 8;
-                    // g_I2C_SharedData.rawDataBuf_au8[1] = 0;
-                    
-                    // Next 4 bytes: float speed value
-                    //memcpy(&g_I2C_SharedData.rawDataBuf_au8[2], &speed, sizeof(float));
-                    
-                    // Next 4 bytes: timestamp
-                    //memcpy(&g_I2C_SharedData.rawDataBuf_au8[6], &current_time, sizeof(time_t));
-                    
-                    std::cout << "[I2C Thread] Speed reading #" << ++reading_count 
-                              << ": " << speed << " at " << ctime(&current_time);
+                    // std::cout << "[I2C Thread] Speed reading #" << ++reading_count 
+                    //           << ": " << speed << " at " << ctime(&current_time);
+
+                    std::cout << "[I2C thread] Current data: " << tempRawData_str;
                 } else {
                     g_I2C_SharedData.dataValid_b = false;
                     std::cerr << "[I2C Thread] Failed to get valid reading #" << ++reading_count << std::endl;
@@ -380,7 +395,10 @@ void i2c_reader_thread() {
  * Initialization and Cleanup Functions (for external use)
  ********************************************************************************/
 
-// Function to initialize I2C module (call this before using other functions)
+/**
+ * @brief Function for initializing the sensor data
+ * 
+ */
 bool I2C_Initialize() {
     // Initialize global data
     memset(&g_I2C_SharedData, 0, sizeof(g_I2C_SharedData));
@@ -391,7 +409,10 @@ bool I2C_Initialize() {
     return true;
 }
 
-// Function to cleanup I2C module
+/**
+ * @brief Function for set flag of i2c running status
+ * 
+ */
 void I2C_Cleanup() {
     g_running = false;
     std::cout << "I2C module cleanup completed" << std::endl;

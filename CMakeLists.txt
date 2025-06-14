@@ -11,8 +11,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Remove the casting warning -> Despite it not safe casting, but there are no other choice
 add_compile_options(-Wno-write-strings)
 
+# Add the library of MLDSA
+add_subdirectory(mldsa)
+
 # Add the inclusion
 include_directories(include)
+
+
+
 
 # Find the library
 # 1. Open62541
@@ -35,4 +41,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
                 open62541::open62541                            # -> open62541
                 /usr/lib/aarch64-linux-gnu/libgpiod.so          # -> gpiod
                 Boost::boost                                    # -> Boost
+                mldsa_mode2
 )

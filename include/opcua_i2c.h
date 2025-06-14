@@ -7,16 +7,20 @@
 #include <atomic>
 #include <time.h>
 #include <gpiod.h>
+#include "mldsa.h"
+
 #define OPCUA_SERVER_RAW_DATA_SIZE          10         // 2 bytes length + 8 bytes of data
 
 /********************************************************************************
  * I2C Shared Data Structure
  ********************************************************************************/
 typedef struct {
-    bool dataValid_b;
-    unsigned char rawDataBuf_au8[OPCUA_SERVER_RAW_DATA_SIZE];
-    float currentSpeed;
-    time_t lastUpdateTime;
+    bool dataValid_b;        
+    float currentSpeed;      // current speed value
+    time_t lastUpdateTime;   // data and time
+    uint8_t signature[4097]; // data which contain the signature
+    uint8_t rawDataBuf_au8[10];
+    std::string rawData_str;
 } I2C_SharedData_tst;
 
 /********************************************************************************

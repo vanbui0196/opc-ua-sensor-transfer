@@ -57,6 +57,8 @@
         "fstream": "cpp",
         "iostream": "cpp",
         "istream": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "*.bak": "cpp",
+        "iomanip": "cpp"
     }
 }
