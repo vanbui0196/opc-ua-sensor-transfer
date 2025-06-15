@@ -1,19 +1,4 @@
-# Optional: Build test executable (only if this is standalone or explicitly requested)
-option(MLDSA_BUILD_TESTS "Build MLDSA test executables" OFF)
-
-if(MLDSA_BUILD_TESTS AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
-    add_executable(mldsa_mode2_test ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
-    target_link_libraries(mldsa_mode2_test PRIVATE mldsa_mode2)
-    target_compile_definitions(mldsa_mode2_test PRIVATE DILITHIUM_MODE=2)
-    
-    add_executable(mldsa_mode3_test ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
-    target_link_libraries(mldsa_mode3_test PRIVATE mldsa_mode3)
-    target_compile_definitions(mldsa_mode3_test PRIVATE DILITHIUM_MODE=3)
-    
-    add_executable(mldsa_mode5_test ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
-    target_link_libraries(mldsa_mode5_test PRIVATE mldsa_mode5)
-    target_compile_definitions(mldsa_mode5_test PRIVATE DILITHIUM_MODE=5)
-endif()# MLDSA Library CMakeLists.txt
+# MLDSA Library CMakeLists.txt
 # This file is designed to be included as a subdirectory in a parent project
 
 # Only set project if this is the top-level CMakeLists.txt
@@ -33,10 +18,7 @@ set(MLDSA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/source/mldsa.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/poly_algo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/utils.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/stream.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/fips202.c)
-
-#set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ref/source/fips202.cpp PROPERTIES LANGUAGE C)
+    ${CMAKE_CURRENT_SOURCE_DIR}/ref/source/stream.cpp)
 
 # Create static libraries for different modes
 add_library(mldsa_mode2 STATIC ${MLDSA_SOURCES})
@@ -64,6 +46,23 @@ target_include_directories(mldsa_mode5 PUBLIC
 add_library(mldsa::mode2 ALIAS mldsa_mode2)
 add_library(mldsa::mode3 ALIAS mldsa_mode3)
 add_library(mldsa::mode5 ALIAS mldsa_mode5)
+
+# Optional: Build test executable (only if this is standalone or explicitly requested)
+option(MLDSA_BUILD_TESTS "Build MLDSA test executables" OFF)
+
+if(MLDSA_BUILD_TESTS AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
+    add_executable(mldsa_mode2_test ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
+    target_link_libraries(mldsa_mode2_test PRIVATE mldsa_mode2)
+    target_compile_definitions(mldsa_mode2_test PRIVATE DILITHIUM_MODE=2)
+    
+    add_executable(mldsa_mode3_test ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
+    target_link_libraries(mldsa_mode3_test PRIVATE mldsa_mode3)
+    target_compile_definitions(mldsa_mode3_test PRIVATE DILITHIUM_MODE=3)
+    
+    add_executable(mldsa_mode5_test ${CMAKE_CURRENT_SOURCE_DIR}/test/main.cpp)
+    target_link_libraries(mldsa_mode5_test PRIVATE mldsa_mode5)
+    target_compile_definitions(mldsa_mode5_test PRIVATE DILITHIUM_MODE=5)
+endif()
 
 # Enable compile commands export
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

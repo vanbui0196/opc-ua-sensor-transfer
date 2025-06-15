@@ -33,6 +33,13 @@ using namespace std::literals; // Geting the name more essy of chrono
 #define OPCUA_SERVER_RAW_DATA_SIZE          10         // 2 bytes length + 8 bytes of data
 
 /********************************************************************************
+ * Global data for the signature
+ ********************************************************************************/
+MLDSA mldsa_signer;
+std::array<uint8_t, CRYPTO_PUBLICKEYBYTES> OpcUa_PubKey_array;
+std::array<uint8_t, CRYPTO_SECRETKEYBYTES> OpcUa_SecretKey_array;
+
+/********************************************************************************
  * Global data structure for sharing with OPC UA server
  ********************************************************************************/
 
@@ -182,9 +189,12 @@ bool configure_i2c(int file, I2C_Config& config) {
     return true;
 }
 
-
-
-
+/**
+ * @brief This will read a sample of i2c
+ * 
+ * @param file Point to the I2C pointer
+ * @return float Speed value of current
+ */
 float read_single_sample(int file) {
 
     // ===================
@@ -230,6 +240,13 @@ float read_single_sample(int file) {
     return raw_data * 0.073f;
 }
 
+/**
+ * @brief Get the median object of the I2C sensor
+ * 
+ * @param values Array of the float value
+ * @param count Number of total sample
+ * @return float 
+ */
 float get_median(float values[], int count) {
     if (count == 0) return -1;
     
@@ -342,6 +359,9 @@ void i2c_reader_thread() {
             close(i2c_fd);
             return;
         }
+
+        // Set up the key
+        mldsa_signer.KeyGen(OpcUa_PubKey_array, OpcUa_SecretKey_array);
         
         config.i2c_fd = i2c_fd;
         g_i2cInitialized = true;
@@ -356,8 +376,19 @@ void i2c_reader_thread() {
 
             // Convert the data from float to string (this is because <format> still not fully support on the GCC12 on Raspberry Pi)
             std::ostringstream string_stream;
-            string_stream << std::fixed << std::setprecision(2) << speed << " " << ctime(&current_time);
+
+            std::string currentTime_str = ctime(&current_time);
+            currentTime_str.pop_back();
+            string_stream << std::fixed << std::setprecision(2) << speed << " " << currentTime_str;
             std::string tempRawData_str =  string_stream.str();
+            std::cout << "[DEBUG] Current data and length: " << tempRawData_str << ", length: " << tempRawData_str.length() << std::endl;
+    
+            
+            // Get the data buffer from the string 
+            std::span<uint8_t> dataIn(reinterpret_cast<uint8_t*>(tempRawData_str.data()), tempRawData_str.size());
+            std::span<uint8_t> sigOut(reinterpret_cast<uint8_t*>(g_I2C_SharedData.signature), CRYPTO_BYTES);
+            I2C_Sensor_Signature_Signing(dataIn, sigOut);
+
             // Update global data with thread safety
             {
                 std::unique_lock<std::shared_mutex> lock(g_dataMutex);
@@ -368,8 +399,16 @@ void i2c_reader_thread() {
                     g_I2C_SharedData.dataValid_b = true;
                     g_I2C_SharedData.lastUpdateTime = current_time;
                     g_I2C_SharedData.rawData_str = tempRawData_str;
+                    //memcpy(g_I2C_SharedData.signature, sigOut.data(), CRYPTO_BYTES);
                     
                     std::cout << "[I2C thread] Current data: " << tempRawData_str;
+
+                    // Test code - to removed ============
+                    std::array<uint8_t, 128> _test;
+                    std::cout << "[I2C thread] Size of data: " << tempRawData_str.size() << std::endl;
+                    std::span<uint8_t> _tmpStr(reinterpret_cast<uint8_t*>(tempRawData_str.data()), tempRawData_str.size());
+                    shake_test(_tmpStr, _test);
+                    // ===================================
                 } else {
                     g_I2C_SharedData.dataValid_b = false;
                     std::cerr << "[I2C Thread] Failed to get valid reading #" << ++reading_count << std::endl;
@@ -423,14 +462,16 @@ void I2C_Cleanup() {
 /**
  * @brief Signing the data with Shake 256
  * 
- * @param dataIn Data for signing 
+ * @param dataIn Data for signing (sensor data)
  * @param sigOut Signature of data
  * @return true Signature is ready
  * @return false Signature is not ready
  */
-bool I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut) {
-    // return value to indicate that signing is success
-    bool retVal_b = false;
+void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut) {
+    // Local value
+    bool retVal_b = false; // return value if the signature is available
+    std::array<uint8_t, 128> dataHash_au8; dataHash_au8.fill(0); // hash containning array
+    size_t sigLength{0};
 
     // shake init state
     keccak_state state;
@@ -442,8 +483,35 @@ bool I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> 
     // finalize the shake
     shake128_finalize(&state);
 
-    // Get the value
+    // Get the value of the shake128 function
+    shake128_squeeze(dataHash_au8.data(), 128, &state);
 
-    
+    std::cout << std::endl;
+    // Signing the data
+    mldsa_signer.Sign(
+        sigOut.data(),          // Signed mesasge
+        &sigLength,             // Signed data lenth
+        dataHash_au8.data(),    // Message in (hash of data with shake128)
+        128,                    // Use all 128 byte of the message
+        nullptr, 0,             // No context message at all
+        OpcUa_SecretKey_array   // The array that set the secret key
+    );
+}
 
+void shake_test(std::span<uint8_t> dataIn, std::span<uint8_t> hashOut) {
+    keccak_state state;
+
+    shake128_init(&state);
+
+    shake128_absorb(&state, dataIn.data(), dataIn.size());
+
+    shake128_finalize(&state);
+
+    shake128_squeeze(hashOut.data(), hashOut.size(), &state);
+
+    std::cout << "[I2C thread] Current Hash Value: ";
+    for(auto each_byte : hashOut) {
+        std::cout << std::hex << static_cast<int>(each_byte);
+    }
+    std::cout << std::endl;
 }

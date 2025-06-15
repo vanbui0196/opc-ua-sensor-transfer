@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(opcua_server
         VERSION 1.0.0
-        LANGUAGES CXX)
+        LANGUAGES CXX C) # Add C language support
 
 
 # (Actually project only compatible with the C99 version)
@@ -30,11 +30,12 @@ find_package(Boost CONFIG REQUIRED)
 set(SOURCES_FILES 
         src/server.cpp 
         src/i2c.cpp
+        mldsa/ref/source/fips202.c
 )
 
 # Add project execution
 add_executable(${PROJECT_NAME} 
-                ${SOURCES_FILES})
+        ${SOURCES_FILES})
 
 # Link the library to project
 target_link_libraries(${PROJECT_NAME} PRIVATE 
