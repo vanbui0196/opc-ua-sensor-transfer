@@ -17,7 +17,7 @@
 
 #define OPCUA_SERVER_UPDATE_INTERVAL        4000       // 4 seconds in milliseconds
 #define OPCUA_SERVER_RAW_DATA_SIZE          10         // 2 bytes length + 8 bytes of data
-#define OPCUA_SERVER_SIGNATURE_SIZE         4097       // 2 bytes length  + 1 bytes of sig type + 8KB remaining
+#define OPCUA_SERVER_SIGNATURE_SIZE         4098       // 2 bytes length  + 1 bytes of sig type + 8KB remaining
 
 /********************************************************************************
  * I2C Reader Integration - Include the I2C module header
@@ -79,7 +79,7 @@ static void updateSensorData(UA_Server *server, void *data) {
             OpcUa_Server_globData_st.lastUpdateTime = UA_DateTime_fromUnixTime(i2cData.lastUpdateTime);
             
             // Coppy the signature from I2C module
-            memcpy(OpcUa_Server_globData_st.signatureBuf_au8, i2cData.signature, CRYPTO_BYTES);
+            memcpy(OpcUa_Server_globData_st.signatureBuf_au8, i2cData.signature.data(), CRYPTO_BYTES + 2);
             
             // Adding the value to string
             OpcUa_Server_globData_st.rawStringData_str = i2cData.rawData_str;

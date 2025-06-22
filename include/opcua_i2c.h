@@ -18,7 +18,7 @@ typedef struct {
     bool dataValid_b;        
     float currentSpeed;      // current speed value
     time_t lastUpdateTime;   // data and time
-    uint8_t signature[4097]; // data which contain the signature
+    std::array<uint8_t, 4097> signature; // data which contain the signature
     std::string rawData_str;
 } I2C_SharedData_tst;
 

@@ -60,6 +60,7 @@
         "sstream": "cpp",
         "*.bak": "cpp",
         "iomanip": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "codecvt": "cpp"
     }
 }

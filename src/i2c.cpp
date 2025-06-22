@@ -23,6 +23,7 @@
 #include "opcua_i2c.h"
 #include <functional>
 #include "mldsa.h"
+#include "key_parser.h"
 extern "C" {
     #include "fips202.h"
 }
@@ -32,11 +33,10 @@ using namespace std::literals; // Geting the name more essy of chrono
 
 #define OPCUA_SERVER_RAW_DATA_SIZE          10         // 2 bytes length + 8 bytes of data
 
-/********************************************************************************
- * Global data for the signature
- ********************************************************************************/
+//----------------------------
+// Global  Memory for Signing
+//----------------------------
 MLDSA mldsa_signer;
-std::array<uint8_t, CRYPTO_PUBLICKEYBYTES> OpcUa_PubKey_array;
 std::array<uint8_t, CRYPTO_SECRETKEYBYTES> OpcUa_SecretKey_array;
 
 /********************************************************************************
@@ -335,7 +335,8 @@ void i2c_reader_thread() {
     
     I2C_Config config;
     int i2c_fd = -1;
-    
+    // Temporary array to get the signature
+    std::array<uint8_t, CRYPTO_BYTES> sigOut;
     try {
         // Step 1: GPIO Reset
         gpio_reset();
@@ -359,9 +360,17 @@ void i2c_reader_thread() {
             close(i2c_fd);
             return;
         }
+        
+        // Read the key from the .DER file and store into global array
+        KeyParser keyHolder("/home/vanbu/KeyAndCertificate/OpcUA/private_key.der", "ML-DSA-44");
 
-        // Set up the key
-        mldsa_signer.KeyGen(OpcUa_PubKey_array, OpcUa_SecretKey_array);
+        // Check if the key is size if fit for the application
+        if(keyHolder.privateKey.size() != OpcUa_SecretKey_array.size()) {
+            std::cerr << "!!! Secret key size is not as same as  !!!\n";
+        } else {
+            // Copy data from key to global key array
+            std::copy_n(keyHolder.privateKey.begin(), keyHolder.privateKey.size(), OpcUa_SecretKey_array.begin());
+        }
         
         config.i2c_fd = i2c_fd;
         g_i2cInitialized = true;
@@ -386,7 +395,7 @@ void i2c_reader_thread() {
             
             // Get the data buffer from the string 
             std::span<uint8_t> dataIn(reinterpret_cast<uint8_t*>(tempRawData_str.data()), tempRawData_str.size());
-            std::span<uint8_t> sigOut(reinterpret_cast<uint8_t*>(g_I2C_SharedData.signature), CRYPTO_BYTES);
+
             I2C_Sensor_Signature_Signing(dataIn, sigOut);
 
             // Update global data with thread safety
@@ -399,8 +408,14 @@ void i2c_reader_thread() {
                     g_I2C_SharedData.dataValid_b = true;
                     g_I2C_SharedData.lastUpdateTime = current_time;
                     g_I2C_SharedData.rawData_str = tempRawData_str;
-                    //memcpy(g_I2C_SharedData.signature, sigOut.data(), CRYPTO_BYTES);
-                    
+
+                    // Fetch the signature to the global structure
+                    g_I2C_SharedData.signature.at(0) = (uint8_t)(CRYPTO_BYTES >> 8);
+                    g_I2C_SharedData.signature.at(1) = (uint8_t)(CRYPTO_BYTES);
+
+                    // Copy data from local buffer into the thread protected data
+                    std::copy_n(sigOut.data(), CRYPTO_BYTES, g_I2C_SharedData.signature.data() + 2);
+
                     std::cout << "[I2C thread] Current data: " << tempRawData_str;
 
                     // Test code - to removed ============
@@ -408,6 +423,13 @@ void i2c_reader_thread() {
                     std::cout << "[I2C thread] Size of data: " << tempRawData_str.size() << std::endl;
                     std::span<uint8_t> _tmpStr(reinterpret_cast<uint8_t*>(tempRawData_str.data()), tempRawData_str.size());
                     shake_test(_tmpStr, _test);
+
+                    // == Debug ==
+                    std::cout << "Current private key is and has length: " << keyHolder.privateKey.size() << std::endl;
+                    for(const auto& each_byte : keyHolder.privateKey) {
+                        std::cout << std::hex << (int)each_byte << " ";
+                    }
+                    std::cout << std::endl;
                     // ===================================
                 } else {
                     g_I2C_SharedData.dataValid_b = false;
@@ -421,6 +443,9 @@ void i2c_reader_thread() {
         
     } catch (const std::exception& e) {
         std::cerr << "I2C reader thread exception: " << e.what() << std::endl;
+    }
+    catch (std::runtime_error& e) {
+        std::cerr << e.what() << std::endl;
     }
     
     // Cleanup
