@@ -33,6 +33,9 @@ set(SOURCES_FILES
         mldsa/ref/source/fips202.c
 )
 
+# Include the library for key and certificate parser
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/KeyCertParser)
+
 # Add project execution
 add_executable(${PROJECT_NAME} 
         ${SOURCES_FILES})
@@ -43,4 +46,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
                 /usr/lib/aarch64-linux-gnu/libgpiod.so          # -> gpiod
                 Boost::boost                                    # -> Boost
                 mldsa_mode2                                     # -> mldsa mode
+                CertParser                                      # -> Certificate parser with OpenSSL support
+                KeyParser                                       # -> Key reader with OpenSSL support
 )
