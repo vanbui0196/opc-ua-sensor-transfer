@@ -61,7 +61,8 @@ void I2C_Cleanup();
  */
 void i2c_reader_thread();
 
-void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut);
+//void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut);
+void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut, std::span<uint8_t> hashOutDbg);
 void shake_test(std::span<uint8_t> dataIn, std::span<uint8_t> hashOut);
 /********************************************************************************
  * External Global Variables (for advanced usage)

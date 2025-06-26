@@ -24,6 +24,8 @@
 #include <functional>
 #include "mldsa.h"
 #include "key_parser.h"
+#include "cert_parser.h"
+
 extern "C" {
     #include "fips202.h"
 }
@@ -363,7 +365,13 @@ void i2c_reader_thread() {
         
         // Read the key from the .DER file and store into global array
         KeyParser keyHolder("/home/vanbu/KeyAndCertificate/OpcUA/private_key.der", "ML-DSA-44");
+        CertParser certHolder("/home/vanbu/KeyAndCertificate/OpcUA/certificate.der");
 
+        std::array<uint8_t, 1312> tempPublicKey;
+
+        for(size_t i = 0; i < certHolder.publicKey.size(); i++) {
+            tempPublicKey.at(i) = certHolder.publicKey.at(i);
+        }
         // Check if the key is size if fit for the application
         if(keyHolder.privateKey.size() != OpcUa_SecretKey_array.size()) {
             std::cerr << "!!! Secret key size is not as same as  !!!\n";
@@ -396,7 +404,11 @@ void i2c_reader_thread() {
             // Get the data buffer from the string 
             std::span<uint8_t> dataIn(reinterpret_cast<uint8_t*>(tempRawData_str.data()), tempRawData_str.size());
 
-            I2C_Sensor_Signature_Signing(dataIn, sigOut);
+            std::array<uint8_t, 128> dataHash_au8; dataHash_au8.fill(0); // hash containning array
+            I2C_Sensor_Signature_Signing(dataIn, sigOut, dataHash_au8);
+
+            // Self verification
+            int verify_result = mldsa_signer.Verify(sigOut.data(), sigOut.size(), dataHash_au8.data(), dataHash_au8.size(), nullptr, 0, tempPublicKey);
 
             // Update global data with thread safety
             {
@@ -416,7 +428,7 @@ void i2c_reader_thread() {
                     // Copy data from local buffer into the thread protected data
                     std::copy_n(sigOut.data(), CRYPTO_BYTES, g_I2C_SharedData.signature.data() + 2);
 
-                    std::cout << "[I2C thread] Current data: " << tempRawData_str;
+                    std::cout << "[I2C thread] Current data: " << tempRawData_str << std::endl;
 
                     // Test code - to removed ============
                     std::array<uint8_t, 128> _test;
@@ -425,11 +437,22 @@ void i2c_reader_thread() {
                     shake_test(_tmpStr, _test);
 
                     // == Debug ==
-                    std::cout << "Current private key is and has length: " << keyHolder.privateKey.size() << std::endl;
-                    for(const auto& each_byte : keyHolder.privateKey) {
-                        std::cout << std::hex << (int)each_byte << " ";
+                    // /* Get the first 2 bytes for getting the length */
+                    // uint8_t firstByte = g_I2C_SharedData.signature.at(0);
+                    // uint8_t scndByte = g_I2C_SharedData.signature.at(1);
+
+                    // size_t totalBytes = static_cast<size_t>(firstByte << 8) | static_cast<size_t>(scndByte);
+                    
+                    // for(size_t index = 0; index < totalBytes; index++) {
+                    //     std::cout <<  std::setfill('0') << std::setw(2) << std::hex << (int)g_I2C_SharedData.signature.at(index) << " ";
+                    // }
+                    // std::cout << std::endl;
+                    std::cout << "Main hash: " << std::endl;
+                    for(auto each_byte : dataHash_au8) {
+                        std::cout << std::hex << static_cast<int>(each_byte);
                     }
                     std::cout << std::endl;
+                    std::cout << "Signature is valid:" << std::dec << verify_result << std::endl;
                     // ===================================
                 } else {
                     g_I2C_SharedData.dataValid_b = false;
@@ -441,13 +464,17 @@ void i2c_reader_thread() {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         
-    } catch (const std::exception& e) {
-        std::cerr << "I2C reader thread exception: " << e.what() << std::endl;
-    }
+    } 
     catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
     }
-    
+    catch (const std::exception& e) {
+        std::cerr << "I2C reader thread exception: " << e.what() << std::endl;
+    }
+    catch(...) {
+        std::cerr << "Catch unexpected error" << std::endl;
+    }
+
     // Cleanup
     if (i2c_fd >= 0) {
         close(i2c_fd);
@@ -492,10 +519,10 @@ void I2C_Cleanup() {
  * @return true Signature is ready
  * @return false Signature is not ready
  */
-void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut) {
+void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut, std::span<uint8_t> hashOutDbg) {
     // Local value
     bool retVal_b = false; // return value if the signature is available
-    std::array<uint8_t, 128> dataHash_au8; dataHash_au8.fill(0); // hash containning array
+
     size_t sigLength{0};
 
     // shake init state
@@ -509,14 +536,14 @@ void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> 
     shake128_finalize(&state);
 
     // Get the value of the shake128 function
-    shake128_squeeze(dataHash_au8.data(), 128, &state);
+    shake128_squeeze(hashOutDbg.data(), 128, &state);
 
     std::cout << std::endl;
     // Signing the data
     mldsa_signer.Sign(
         sigOut.data(),          // Signed mesasge
         &sigLength,             // Signed data lenth
-        dataHash_au8.data(),    // Message in (hash of data with shake128)
+        hashOutDbg.data(),    // Message in (hash of data with shake128)
         128,                    // Use all 128 byte of the message
         nullptr, 0,             // No context message at all
         OpcUa_SecretKey_array   // The array that set the secret key
