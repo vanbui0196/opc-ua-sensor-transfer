@@ -27,7 +27,9 @@
 /********************************************************************************
  * NODE ID GLOBAL
  ********************************************************************************/
+
 UA_NodeId OpcUa_SpeedSensorObjId_st;
+UA_NodeId OpcUa_sensorName_st;
 UA_NodeId OpcUa_sensorSignatureId_NodeIdSt;
 UA_NodeId OpcUa_sensorSpeedValue_NodeIdSt;
 UA_NodeId OpcUa_sensorTimestamp_NodeIdSt;
@@ -191,12 +193,12 @@ int main(int argc, char** argv) {
     
     // Create the main sensor object
     UA_ObjectAttributes spdSensorObjAttribute_st = UA_ObjectAttributes_default;
-    spdSensorObjAttribute_st.displayName = UA_LOCALIZEDTEXT("en-US", "I2C Speed Sensor");
-    spdSensorObjAttribute_st.description = UA_LOCALIZEDTEXT("en-US", "Real-time I2C motor speed sensor");
+    spdSensorObjAttribute_st.displayName = UA_LOCALIZEDTEXT("en-US", "Speed.Sensor");
+    spdSensorObjAttribute_st.description = UA_LOCALIZEDTEXT("en-US", "Motor rotational Speed monitored with I2C communication standard");
 
     UA_Server_addObjectNode(
         server,
-        UA_NODEID_NULL,
+        UA_NODEID_STRING(1, "Speed.Sensor"),
         UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
         UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
         UA_QUALIFIEDNAME(1, "I2C Speed Sensor"),
@@ -219,14 +221,14 @@ int main(int argc, char** argv) {
     
     UA_Server_addVariableNode(
         server,
-        UA_NODEID_NULL,
+        UA_NODEID_STRING(1, "speed.sensor.name"),
         OpcUa_SpeedSensorObjId_st,
         UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
         UA_QUALIFIEDNAME(1, "Sensor Type"),
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
         sensorNameAttribute_st,
         NULL,
-        NULL
+        &OpcUa_sensorName_st
     );
 
     /* 2. Current Speed Value */
@@ -238,7 +240,7 @@ int main(int argc, char** argv) {
     
     UA_Server_addVariableNode(
         server,
-        UA_NODEID_NULL,
+        UA_NODEID_STRING(1, "current.sensor.value"),
         OpcUa_SpeedSensorObjId_st,
         UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
         UA_QUALIFIEDNAME(1, "Current Speed"),
@@ -257,7 +259,7 @@ int main(int argc, char** argv) {
     
     UA_Server_addVariableNode(
         server,
-        UA_NODEID_NULL,
+        UA_NODEID_STRING(1, "current.sensor.timestamp"),
         OpcUa_SpeedSensorObjId_st,
         UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
         UA_QUALIFIEDNAME(1, "Last Update Time"),
@@ -277,7 +279,7 @@ int main(int argc, char** argv) {
 
     UA_Server_addVariableNode(
         server,
-        UA_NODEID_NULL,
+        UA_NODEID_STRING(1, "current.sensor.signature"),
         OpcUa_SpeedSensorObjId_st,
         UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
         UA_QUALIFIEDNAME(1, "Sensor Data Signature"),
@@ -296,7 +298,7 @@ int main(int argc, char** argv) {
     
     UA_Server_addVariableNode(
         server,
-        UA_NODEID_NULL,
+        UA_NODEID_STRING(1, "current.sensor.rawdata.string"),
         OpcUa_SpeedSensorObjId_st,
         UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
         UA_QUALIFIEDNAME(1, "String of the data"),
