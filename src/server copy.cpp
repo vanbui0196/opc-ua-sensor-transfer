@@ -81,7 +81,7 @@ static void updateSensorData(UA_Server *server, void *data) {
             OpcUa_Server_globData_st.lastUpdateTime = UA_DateTime_fromUnixTime(i2cData.lastUpdateTime);
             
             // Coppy the signature from I2C module
-            memcpy(OpcUa_Server_globData_st.signatureBuf_au8, i2cData.signature.data(), CRYPTO_BYTES);
+            memcpy(OpcUa_Server_globData_st.signatureBuf_au8, i2cData.signature.data(), CRYPTO_BYTES + 2);
             
             // Adding the value to string
             OpcUa_Server_globData_st.rawStringData_str = i2cData.rawData_str;
@@ -98,7 +98,7 @@ static void updateSensorData(UA_Server *server, void *data) {
 
         UA_Variant_setArray(&signatureValue, 
                            OpcUa_Server_globData_st.signatureBuf_au8, 
-                           CRYPTO_BYTES, 
+                           OPCUA_SERVER_SIGNATURE_SIZE, 
                            &UA_TYPES[UA_TYPES_BYTE]);
         UA_Server_writeValue(server, OpcUa_sensorSignatureId_NodeIdSt, signatureValue);
         

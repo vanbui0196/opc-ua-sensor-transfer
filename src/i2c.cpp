@@ -421,12 +421,9 @@ void i2c_reader_thread() {
                     g_I2C_SharedData.lastUpdateTime = current_time;
                     g_I2C_SharedData.rawData_str = tempRawData_str;
 
-                    // Fetch the signature to the global structure
-                    g_I2C_SharedData.signature.at(0) = (uint8_t)(CRYPTO_BYTES >> 8);
-                    g_I2C_SharedData.signature.at(1) = (uint8_t)(CRYPTO_BYTES);
 
-                    // Copy data from local buffer into the thread protected data
-                    std::copy_n(sigOut.data(), CRYPTO_BYTES, g_I2C_SharedData.signature.data() + 2);
+                    // Update data from local to global buffer in lock
+                    std::copy_n(sigOut.data(), CRYPTO_BYTES, g_I2C_SharedData.signature.data());
 
                     std::cout << "[I2C thread] Current data: " << tempRawData_str << std::endl;
 
