@@ -119,10 +119,9 @@ static void updateSensorData(UA_Server *server, void *data) {
         UA_Server_writeValue(server, OpcUa_rawData_String_NodeIdSt, rawStringValue);
 
         // Log the data
+        std::string logData = std::string(reinterpret_cast<char*>(rawStringCpy_uaStr.data), rawStringCpy_uaStr.length);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                    "Updated sensor data: Speed=%.2f rpm, Valid=%s", 
-                    OpcUa_Server_globData_st.currentSpeed,
-                    OpcUa_Server_globData_st.dataValid_b ? "true" : "false");
+                    "\033[1;36mSERVER DATA:\033[0m \033[1;35m%s\033[0m", logData.c_str());
     } else {
         UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
                       "No valid I2C data available for update");

@@ -286,8 +286,7 @@ float read_sensor_data(int file) {
     
     if (valid_samples > 0) {
         float result = get_median(samples, valid_samples);
-        //std::cout << "Valid samples: " << valid_samples << "/40, Result: " << result << std::endl;
-        std::cout << "Current speed: " << result << std::endl;
+        //std::cout << "Current speed: " << result << std::endl;
         return result;
     }
     
@@ -309,7 +308,6 @@ bool I2C_GetCurrentData(I2C_SharedData_tst& data) {
     // Reading data only, no need to use the exculsive lock
     std::shared_lock<std::shared_mutex> lock(g_dataMutex);
     data = g_I2C_SharedData;
-    std::cout << "[DEBUG - TO BE DELETED]: Seeed: " << g_I2C_SharedData.currentSpeed << std::endl;
     return data.dataValid_b;
 }
 
@@ -398,8 +396,6 @@ void i2c_reader_thread() {
             currentTime_str.pop_back();
             string_stream << std::fixed << std::setprecision(2) << speed << " " << currentTime_str;
             std::string tempRawData_str =  string_stream.str();
-            std::cout << "[DEBUG] Current data and length: " << tempRawData_str << ", length: " << tempRawData_str.length() << std::endl;
-    
             
             // Get the data buffer from the string 
             std::span<uint8_t> dataIn(reinterpret_cast<uint8_t*>(tempRawData_str.data()), tempRawData_str.size());
@@ -425,31 +421,11 @@ void i2c_reader_thread() {
                     // Update data from local to global buffer in lock
                     std::copy_n(sigOut.data(), CRYPTO_BYTES, g_I2C_SharedData.signature.data());
 
-                    std::cout << "[I2C thread] Current data: " << tempRawData_str << std::endl;
+                    std::string sigStatus = 
+                    ((verify_result == 0) ? std::string("\033[1;32mSIG_VALID\033[0m") : std::string("SIG_INVALID\033[1;31m"));
 
-                    // Test code - to removed ============
-                    std::array<uint8_t, 128> _test;
-                    std::cout << "[I2C thread] Size of data: " << tempRawData_str.size() << std::endl;
-                    std::span<uint8_t> _tmpStr(reinterpret_cast<uint8_t*>(tempRawData_str.data()), tempRawData_str.size());
-                    shake_test(_tmpStr, _test);
+                    std::cout << "\033[1;36m" << "[SERVER VALIDATION]:" << "\033[0m" << sigStatus << std::endl;
 
-                    // == Debug ==
-                    // /* Get the first 2 bytes for getting the length */
-                    // uint8_t firstByte = g_I2C_SharedData.signature.at(0);
-                    // uint8_t scndByte = g_I2C_SharedData.signature.at(1);
-
-                    // size_t totalBytes = static_cast<size_t>(firstByte << 8) | static_cast<size_t>(scndByte);
-                    
-                    // for(size_t index = 0; index < totalBytes; index++) {
-                    //     std::cout <<  std::setfill('0') << std::setw(2) << std::hex << (int)g_I2C_SharedData.signature.at(index) << " ";
-                    // }
-                    // std::cout << std::endl;
-                    std::cout << "Main hash: " << std::endl;
-                    for(auto each_byte : dataHash_au8) {
-                        std::cout << std::hex << static_cast<int>(each_byte);
-                    }
-                    std::cout << std::endl;
-                    std::cout << "Signature is valid:" << std::dec << verify_result << std::endl;
                     // ===================================
                 } else {
                     g_I2C_SharedData.dataValid_b = false;
