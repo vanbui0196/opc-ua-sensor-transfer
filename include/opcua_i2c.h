@@ -9,18 +9,19 @@
 #include <gpiod.h>
 #include "mldsa.h"
 #include <span>
-#define OPCUA_SERVER_RAW_DATA_SIZE          10         // 2 bytes length + 8 bytes of data
+#define OPCUA_SERVER_RAW_DATA_SIZE 10 // 2 bytes length + 8 bytes of data
 
 /********************************************************************************
  * I2C Shared Data Structure
  ********************************************************************************/
-typedef struct {
-    bool dataValid_b;        
-    float currentSpeed;      // current speed value
-    time_t lastUpdateTime;   // data and time
+typedef struct
+{
+    bool is_data_valid_flg;
+    float current_data;                  // current speed value
+    time_t last_timestamp;               // data and time
     std::array<uint8_t, 4097> signature; // data which contain the signature
-    std::string rawData_str;
-} I2C_SharedData_tst;
+    std::string raw_data_str;
+} i2c_data_structure_t;
 
 /********************************************************************************
  * External API Function Declarations
@@ -30,30 +31,30 @@ typedef struct {
  * @brief Initialize the I2C module
  * @return true if initialization successful, false otherwise
  */
-bool I2C_Initialize();
+bool i2c_init();
 
 /**
  * @brief Get current sensor data (thread-safe)
  * @param data Reference to data structure to fill
  * @return true if valid data available, false otherwise
  */
-bool I2C_GetCurrentData(I2C_SharedData_tst& data);
+bool i2c_get_current_data(i2c_data_structure_t &data);
 
 /**
  * @brief Check if I2C is initialized and ready
  * @return true if initialized, false otherwise
  */
-bool I2C_IsInitialized();
+bool i2c_init_check();
 
 /**
  * @brief Stop I2C reading thread
  */
-void I2C_Stop();
+void i2c_stop_handler();
 
 /**
  * @brief Cleanup I2C module resources
  */
-void I2C_Cleanup();
+void i2c_cleanup_handler();
 
 /**
  * @brief Main I2C reader thread function
@@ -61,15 +62,15 @@ void I2C_Cleanup();
  */
 void i2c_reader_thread();
 
-//void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut);
-void I2C_Sensor_Signature_Signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut, std::span<uint8_t> hashOutDbg);
-void shake_test(std::span<uint8_t> dataIn, std::span<uint8_t> hashOut);
-/********************************************************************************
- * External Global Variables (for advanced usage)
- ********************************************************************************/
-extern std::shared_mutex g_dataMutex;
-extern std::atomic<bool> g_running;
-extern std::atomic<bool> g_i2cInitialized;
-extern I2C_SharedData_tst g_I2C_SharedData;
+// void i2c_sensor_signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut);
+void i2c_sensor_signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut, std::span<uint8_t> hashOutDbg);
+
+/*********************************************
+ * extern the variable in case of usage demand
+ *********************************************/
+extern std::shared_mutex data_mutex_shared;
+extern std::atomic<bool> i2c_running_flg;
+extern std::atomic<bool> i2c_init_flg;
+extern i2c_data_structure_t i2c_shared_data;
 
 #endif // I2C_READER_THREADED_H
