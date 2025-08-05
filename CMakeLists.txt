@@ -17,9 +17,6 @@ add_subdirectory(mldsa)
 # Add the inclusion
 include_directories(include)
 
-
-
-
 # Find the library
 # 1. Open62541
 find_package(open62541 CONFIG REQUIRED)
@@ -43,9 +40,9 @@ add_executable(${PROJECT_NAME}
 # Link the library to project
 target_link_libraries(${PROJECT_NAME} PRIVATE 
                 open62541::open62541                            # -> open62541
-                /usr/lib/aarch64-linux-gnu/libgpiod.so          # -> gpiod
+                /usr/local/lib/libgpiod.so
                 Boost::boost                                    # -> Boost
-                mldsa_mode2                                     # -> mldsa mode
+                mldsa_mode5                                     # -> mldsa mode
                 CertParser                                      # -> Certificate parser with OpenSSL support
                 KeyParser                                       # -> Key reader with OpenSSL support
 )

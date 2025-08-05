@@ -19,7 +19,7 @@ typedef struct
     bool is_data_valid_flg;
     float current_data;                  // current speed value
     time_t last_timestamp;               // data and time
-    std::array<uint8_t, 4097> signature; // data which contain the signature
+    std::array<uint8_t, CRYPTO_BYTES> signature; // data which contain the signature
     std::string raw_data_str;
 } i2c_data_structure_t;
 

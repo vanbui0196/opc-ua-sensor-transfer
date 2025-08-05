@@ -22,17 +22,10 @@
 #include <span>
 #include <sstream>
 
-// Additional includes for MODE processing
-#include <map>
-#include <vector>
-#include <algorithm>
-#include <cmath>
-
 #include "cert_parser.h"
 #include "key_parser.h"
 #include "mldsa.h"
 #include "opcua_i2c.h"
-#include <chrono>
 
 extern "C" {
 #include "fips202.h"
@@ -69,7 +62,7 @@ struct i2c_config {
 std::shared_mutex data_mutex_shared;
 std::atomic<bool> i2c_running_flg{true};
 std::atomic<bool> i2c_init_flg{false};
-std::atomic<int> measurement_sample_count{0};
+
 /********************************************************************
  * Randomized data -> allowing to run without sensor on local network
  *******************************************************************/
@@ -267,65 +260,6 @@ float read_single_sample(int file) {
 }
 
 /**
- * @brief NEW: This will read a sample of i2c with rounding (matches Python behavior).
- * This is 100% convert from Python file.
- * I don't have any data sheet of the sensor
- *
- * @param file Point to the I2C pointer
- * @return float Speed value of current with 2 decimal rounding
- */
-float read_single_sample_rounded(int file) {
-  if (true == is_randomized) {
-    static int loc_Counter = 0;
-    static int sample_count{0};
-
-    if (sample_count > 500 && sample_count < 1000) {
-      loc_Counter = loc_Counter - 10;
-
-    } else {
-      loc_Counter = loc_Counter + 10;
-    }
-    sample_count++;
-
-    // Round to 2 decimal places like Python
-    float raw_result = ((float)loc_Counter * 0.073f);
-    return std::round(raw_result * 100.0f) / 100.0f;
-  }
-
-  unsigned char reg = 0x01;
-  unsigned char data[2];
-  int raw_data;
-
-  // Write register address
-  if (write(file, &reg, 1) != 1) {
-    return -1;
-  }
-
-  // Read 2 bytes of data
-  if (read(file, data, 2) != 2) {
-    return -1;
-  }
-
-  // Combine bytes (little-endian)
-  raw_data = (data[1] << 8) | data[0];
-
-  // Filter out peak values
-  if (raw_data >= 12000) {
-    return -1;
-  }
-
-  // Handle negative values
-  if (raw_data & 0x80) {
-    raw_data &= ~(1 << 7);
-    raw_data = -raw_data;
-  }
-
-  // Apply conversion factor AND round to 2 decimal places (like Python)
-  float result = raw_data * 0.073f;
-  return std::round(result * 100.0f) / 100.0f;
-}
-
-/**
  * @brief Get the median object of the I2C sensor
  *
  * @param values Array of the float value
@@ -350,49 +284,6 @@ float median_filter(float values[], int count) {
 }
 
 /**
- * @brief NEW: Get the MODE (most frequent value) from array - matches Python behavior exactly
- *
- * @param values Array of float values
- * @param count Number of samples
- * @return float Most frequent value, or median of modes if tie
- */
-float mode_filter(float values[], int count) {
-  if (count == 0) return -1.0f;
-
-  // Create frequency map (equivalent to Python dictionary)
-  std::map<float, int> freq;
-  for (int i = 0; i < count; i++) {
-    freq[values[i]]++;  // Count occurrences
-  }
-
-  // Find the maximum frequency
-  int max_freq = 0;
-  for (const auto& pair : freq) {
-    if (pair.second > max_freq) {
-      max_freq = pair.second;
-    }
-  }
-
-  // Collect all values that appear with maximum frequency
-  std::vector<float> modes;
-  for (const auto& pair : freq) {
-    if (pair.second == max_freq) {
-      modes.push_back(pair.first);
-    }
-  }
-
-  // If multiple modes, return median of the modes (Python behavior)
-  if (modes.size() > 1) {
-    std::sort(modes.begin(), modes.end());
-    size_t mid = modes.size() / 2;
-    return modes[mid];
-  }
-
-  // Return the single mode
-  return modes[0];
-}
-
-/**
  * @brief reading sensor value from the i2c sensor. This is 100% convert from
  * the python file of the predecessor owner, i don't have any datasheet of the
  * sensor
@@ -408,7 +299,7 @@ float read_sensor_data(int file) {
 
   // Take 40 samples with 25ms intervals
   for (int i = 0; i < 40 && i2c_running_flg; i++) {
-    float sample = read_single_sample_rounded(file);  // Use rounded version now
+    float sample = read_single_sample(file);
     if (sample >= 0) {
       samples[valid_samples++] = sample;
     } else {
@@ -420,7 +311,7 @@ float read_sensor_data(int file) {
   }
 
   if (valid_samples > 0) {
-    float result = mode_filter(samples, valid_samples);  // Use MODE instead of median
+    float result = median_filter(samples, valid_samples);
     return result;
   }
 
@@ -492,10 +383,10 @@ void i2c_reader_thread() {
     }
 
     // Read the key from the .DER file and store into global array
-    KeyParser keyHolder("/home/vanbu/KeyAndCertificate/OpcUA/mldsa_87/private_key.der",
-                        "ML-DSA-87");
+    KeyParser keyHolder("/home/vanbu/KeyAndCertificate/OpcUA/private_key.der",
+                        "ML-DSA-44");
     CertParser certHolder(
-        "/home/vanbu/KeyAndCertificate/OpcUA/mldsa_87/certificate.der");
+        "/home/vanbu/KeyAndCertificate/OpcUA/certificate.der");
 
     std::array<uint8_t, CRYPTO_PUBLICKEYBYTES> tempPublicKey;
 
@@ -542,17 +433,9 @@ void i2c_reader_thread() {
       i2c_sensor_signing(dataIn, sigOut, dataHash_au8);
 
       // Self verification
-
-      // start the measurement
-      auto start = std::chrono::high_resolution_clock::now();
       int verify_result =
-        mldsa_signer.Verify(sigOut.data(), sigOut.size(), dataHash_au8.data(),
-                            dataHash_au8.size(), nullptr, 0, tempPublicKey);
-
-      auto end = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-      std::cout << "[MEASUREMENT][VERIFYING] Time," << duration.count() << ",ms" << ",sample" << measurement_sample_count << std::endl;
-      measurement_sample_count++;
+          mldsa_signer.Verify(sigOut.data(), sigOut.size(), dataHash_au8.data(),
+                              dataHash_au8.size(), nullptr, 0, tempPublicKey);
 
       // Update global data with thread safety
       {
@@ -670,4 +553,3 @@ void i2c_sensor_signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut,
       OpcUa_SecretKey_array  // The array that set the secret key
   );
 }
-
