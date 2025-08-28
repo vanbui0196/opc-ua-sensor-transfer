@@ -411,7 +411,7 @@ float read_sensor_data(int file) {
     }
 
     // Sleep 25ms and waiting for next reading
-    std::this_thread::sleep_for(10ms);  // 25ms delay
+    std::this_thread::sleep_for(25ms);  // 25ms delay
   }
 
   if (valid_samples > 0) {
