@@ -40,7 +40,7 @@ add_executable(${PROJECT_NAME}
 # Link the library to project
 target_link_libraries(${PROJECT_NAME} PRIVATE 
                 open62541::open62541                            # -> open62541
-                /usr/local/lib/libgpiod.so
+                /usr/lib/aarch64-linux-gnu/libgpiod.so
                 Boost::boost                                    # -> Boost
                 mldsa_mode5                                     # -> mldsa mode
                 CertParser                                      # -> Certificate parser with OpenSSL support

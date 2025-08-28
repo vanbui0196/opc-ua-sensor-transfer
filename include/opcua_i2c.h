@@ -1,26 +1,26 @@
 #ifndef I2C_READER_THREADED_H
 #define I2C_READER_THREADED_H
 
-#include <thread>
+#include <gpiod.h>
+#include <time.h>
+
+#include <atomic>
 #include <mutex>
 #include <shared_mutex>
-#include <atomic>
-#include <time.h>
-#include <gpiod.h>
-#include "mldsa.h"
 #include <span>
-#define OPCUA_SERVER_RAW_DATA_SIZE 10 // 2 bytes length + 8 bytes of data
+#include <thread>
+
+#include "mldsa.h"
+#define OPCUA_SERVER_RAW_DATA_SIZE 10  // 2 bytes length + 8 bytes of data
 
 /********************************************************************************
  * I2C Shared Data Structure
  ********************************************************************************/
-typedef struct
-{
-    bool is_data_valid_flg;
-    float current_data;                  // current speed value
-    time_t last_timestamp;               // data and time
-    std::array<uint8_t, CRYPTO_BYTES> signature; // data which contain the signature
-    std::string raw_data_str;
+typedef struct {
+  bool is_data_valid_flg;
+  float current_data;     // current speed value
+  time_t last_timestamp;  // data and time
+  std::string raw_data_str;
 } i2c_data_structure_t;
 
 /********************************************************************************
@@ -62,8 +62,7 @@ void i2c_cleanup_handler();
  */
 void i2c_reader_thread();
 
-// void i2c_sensor_signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut);
-void i2c_sensor_signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut, std::span<uint8_t> hashOutDbg);
+void i2c_sensor_signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut);
 
 /*********************************************
  * extern the variable in case of usage demand
@@ -73,4 +72,4 @@ extern std::atomic<bool> i2c_running_flg;
 extern std::atomic<bool> i2c_init_flg;
 extern i2c_data_structure_t i2c_shared_data;
 
-#endif // I2C_READER_THREADED_H
+#endif  // I2C_READER_THREADED_H

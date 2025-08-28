@@ -23,28 +23,22 @@
 #include <sstream>
 
 // Additional includes for MODE processing
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <map>
 #include <vector>
-#include <algorithm>
-#include <cmath>
 
 #include "cert_parser.h"
 #include "key_parser.h"
 #include "mldsa.h"
 #include "opcua_i2c.h"
-#include <chrono>
 
 extern "C" {
 #include "fips202.h"
 }
 
 using namespace std::literals;  // Geting the name more essy of chrono
-
-//----------------------------
-// Global  Memory for Signing
-//----------------------------
-MLDSA mldsa_signer;
-std::array<uint8_t, CRYPTO_SECRETKEYBYTES> OpcUa_SecretKey_array;
 
 /****************************
  * I2C Related configuration
@@ -267,9 +261,9 @@ float read_single_sample(int file) {
 }
 
 /**
- * @brief NEW: This will read a sample of i2c with rounding (matches Python behavior).
- * This is 100% convert from Python file.
- * I don't have any data sheet of the sensor
+ * @brief NEW: This will read a sample of i2c with rounding (matches Python
+ * behavior). This is 100% convert from Python file. I don't have any data sheet
+ * of the sensor
  *
  * @param file Point to the I2C pointer
  * @return float Speed value of current with 2 decimal rounding
@@ -350,7 +344,8 @@ float median_filter(float values[], int count) {
 }
 
 /**
- * @brief NEW: Get the MODE (most frequent value) from array - matches Python behavior exactly
+ * @brief NEW: Get the MODE (most frequent value) from array - matches Python
+ * behavior exactly
  *
  * @param values Array of float values
  * @param count Number of samples
@@ -367,7 +362,7 @@ float mode_filter(float values[], int count) {
 
   // Find the maximum frequency
   int max_freq = 0;
-  for (const auto& pair : freq) {
+  for (const auto &pair : freq) {
     if (pair.second > max_freq) {
       max_freq = pair.second;
     }
@@ -375,7 +370,7 @@ float mode_filter(float values[], int count) {
 
   // Collect all values that appear with maximum frequency
   std::vector<float> modes;
-  for (const auto& pair : freq) {
+  for (const auto &pair : freq) {
     if (pair.second == max_freq) {
       modes.push_back(pair.first);
     }
@@ -420,7 +415,8 @@ float read_sensor_data(int file) {
   }
 
   if (valid_samples > 0) {
-    float result = mode_filter(samples, valid_samples);  // Use MODE instead of median
+    float result =
+        mode_filter(samples, valid_samples);  // Use MODE instead of median
     return result;
   }
 
@@ -465,8 +461,7 @@ void i2c_reader_thread() {
 
   i2c_config config;
   int i2c_fd = -1;
-  // Temporary array to get the signature
-  std::array<uint8_t, CRYPTO_BYTES> sigOut;
+
   try {
     // Step 1: GPIO Reset
     gpio_reset();
@@ -491,26 +486,6 @@ void i2c_reader_thread() {
       return;
     }
 
-    // Read the key from the .DER file and store into global array
-    KeyParser keyHolder("/home/vanbu/KeyAndCertificate/OpcUA/mldsa_87/private_key.der",
-                        "ML-DSA-87");
-    CertParser certHolder(
-        "/home/vanbu/KeyAndCertificate/OpcUA/mldsa_87/certificate.der");
-
-    std::array<uint8_t, CRYPTO_PUBLICKEYBYTES> tempPublicKey;
-
-    for (size_t i = 0; i < certHolder.publicKey.size(); i++) {
-      tempPublicKey.at(i) = certHolder.publicKey.at(i);
-    }
-    // Check if the key is size if fit for the application
-    if (keyHolder.privateKey.size() != OpcUa_SecretKey_array.size()) {
-      std::cerr << "!!! Secret key size is not as same as  !!!\n";
-    } else {
-      // Copy data from key to global key array
-      std::copy_n(keyHolder.privateKey.begin(), keyHolder.privateKey.size(),
-                  OpcUa_SecretKey_array.begin());
-    }
-
     config.i2c_fd = i2c_fd;
     i2c_init_flg = true;
 
@@ -532,28 +507,6 @@ void i2c_reader_thread() {
                     << currentTime_str;
       std::string tempRawData_str = string_stream.str();
 
-      // Get the data buffer from the string
-      std::span<uint8_t> dataIn(
-          reinterpret_cast<uint8_t *>(tempRawData_str.data()),
-          tempRawData_str.size());
-
-      std::array<uint8_t, 128> dataHash_au8;
-      dataHash_au8.fill(0);  // hash containning array
-      i2c_sensor_signing(dataIn, sigOut, dataHash_au8);
-
-      // Self verification
-
-      // start the measurement
-      auto start = std::chrono::high_resolution_clock::now();
-      int verify_result =
-        mldsa_signer.Verify(sigOut.data(), sigOut.size(), dataHash_au8.data(),
-                            dataHash_au8.size(), nullptr, 0, tempPublicKey);
-
-      auto end = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-      std::cout << "[MEASUREMENT][VERIFYING] Time," << duration.count() << ",ms" << ",sample" << measurement_sample_count << std::endl;
-      measurement_sample_count++;
-
       // Update global data with thread safety
       {
         std::unique_lock<std::shared_mutex> lock(data_mutex_shared);
@@ -564,17 +517,6 @@ void i2c_reader_thread() {
           i2c_shared_data.is_data_valid_flg = true;
           i2c_shared_data.last_timestamp = current_time;
           i2c_shared_data.raw_data_str = tempRawData_str;
-
-          // Update data from local to global buffer in lock
-          std::copy_n(sigOut.data(), CRYPTO_BYTES,
-                      i2c_shared_data.signature.data());
-
-          std::string sigStatus =
-              ((verify_result == 0) ? std::string("\033[1;32mSIG_VALID\033[0m")
-                                    : std::string("SIG_INVALID\033[1;31m"));
-
-          std::cout << "\033[1;36m" << "[SERVER VALIDATION]:" << "\033[0m"
-                    << sigStatus << std::endl;
 
           // ===================================
         } else {
@@ -630,44 +572,3 @@ void i2c_cleanup_handler() {
   i2c_running_flg = false;
   std::cout << "I2C module cleanup completed" << std::endl;
 }
-
-/**
- * @brief Signing the data with Shake 256
- *
- * @param dataIn Data for signing (sensor data)
- * @param sigOut Signature of data
- * @return true Signature is ready
- * @return false Signature is not ready
- */
-void i2c_sensor_signing(std::span<uint8_t> dataIn, std::span<uint8_t> sigOut,
-                        std::span<uint8_t> hashOutDbg) {
-  // Local value
-  bool retVal_b = false;  // return value if the signature is available
-
-  size_t sigLength{0};
-
-  // shake init state
-  keccak_state state;
-  shake128_init(&state);
-
-  // shake absorb state
-  shake128_absorb(&state, dataIn.data(), dataIn.size());
-
-  // finalize the shake
-  shake128_finalize(&state);
-
-  // Get the value of the shake128 function
-  shake128_squeeze(hashOutDbg.data(), 128, &state);
-
-  std::cout << std::endl;
-  // Signing the data
-  mldsa_signer.Sign(
-      sigOut.data(),         // Signed mesasge
-      &sigLength,            // Signed data lenth
-      hashOutDbg.data(),     // Message in (hash of data with shake128)
-      128,                   // Use all 128 byte of the message
-      nullptr, 0,            // No context message at all
-      OpcUa_SecretKey_array  // The array that set the secret key
-  );
-}
-
