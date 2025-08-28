@@ -411,7 +411,7 @@ float read_sensor_data(int file) {
     }
 
     // Sleep 25ms and waiting for next reading
-    std::this_thread::sleep_for(25ms);  // 25ms delay
+    std::this_thread::sleep_for(10ms);  // 25ms delay
   }
 
   if (valid_samples > 0) {
@@ -496,15 +496,32 @@ void i2c_reader_thread() {
     while (i2c_running_flg) {
       float speed = read_sensor_data(i2c_fd);
       time_t current_time = time(nullptr);
+      std::string currentTime_str = ctime(&current_time);
+      currentTime_str.pop_back();
+
+      // Get high-precision time
+      auto now = std::chrono::system_clock::now();
+      auto time_t_now = std::chrono::system_clock::to_time_t(now);
+      auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+                              now.time_since_epoch()) %
+                          1000000;
 
       // Convert the data from float to string (this is because <format> still
       // not fully support on the GCC12 on Raspberry Pi)
       std::ostringstream string_stream;
 
-      std::string currentTime_str = ctime(&current_time);
-      currentTime_str.pop_back();
+      // Create time string with microseconds after seconds
+      std::ostringstream time_stream;
+      time_stream << std::put_time(std::localtime(&time_t_now),
+                                   "%a %b %d %H:%M:%S");
+      time_stream << "." << std::setfill('0') << std::setw(6)
+                  << microseconds.count();
+      time_stream << std::put_time(std::localtime(&time_t_now), " %Y");
+      std::string currTime_chrono = time_stream.str();
+
+      // Combine speed and time string
       string_stream << std::fixed << std::setprecision(2) << speed << " "
-                    << currentTime_str;
+                    << currTime_chrono;
       std::string tempRawData_str = string_stream.str();
 
       // Update global data with thread safety
@@ -527,7 +544,7 @@ void i2c_reader_thread() {
       }
 
       // Small delay to prevent CPU overload
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
   } catch (std::runtime_error &e) {
     std::cerr << e.what() << std::endl;
