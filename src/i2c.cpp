@@ -67,7 +67,7 @@ std::atomic<int> measurement_sample_count{0};
 /********************************************************************
  * Randomized data -> allowing to run without sensor on local network
  *******************************************************************/
-std::atomic<bool> is_randomized{true};
+std::atomic<bool> is_randomized{false};
 
 /**
  * @brief I/O report function incase of error with fallback function
@@ -411,7 +411,7 @@ float read_sensor_data(int file) {
     }
 
     // Sleep 25ms and waiting for next reading
-    std::this_thread::sleep_for(25ms);  // 25ms delay
+    std::this_thread::sleep_for(10ms);  // 25ms delay
   }
 
   if (valid_samples > 0) {
