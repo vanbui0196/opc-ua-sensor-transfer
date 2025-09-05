@@ -7,4 +7,4 @@
 #define DILITHIUM_MODE 5
 #endif
 
-#endif // CONFIG_H
+#endif  // CONFIG_H

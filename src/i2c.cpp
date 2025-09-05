@@ -67,7 +67,7 @@ std::atomic<int> measurement_sample_count{0};
 /********************************************************************
  * Randomized data -> allowing to run without sensor on local network
  *******************************************************************/
-std::atomic<bool> is_randomized{false};
+std::atomic<bool> is_randomized{true};
 
 /**
  * @brief I/O report function incase of error with fallback function

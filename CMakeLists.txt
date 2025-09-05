@@ -3,7 +3,11 @@ cmake_minimum_required(VERSION 3.10)
 project(opcua_server
         VERSION 1.0.0
         LANGUAGES CXX C) # Add C language support
-
+# Set a default build type if none was specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to 'Release' as default.")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
 
 # (Actually project only compatible with the C99 version)
 set(CMAKE_CXX_STANDARD 20)
