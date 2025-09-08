@@ -46,7 +46,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
                 open62541::open62541                            # -> open62541
                 /usr/lib/aarch64-linux-gnu/libgpiod.so
                 Boost::boost                                    # -> Boost
-                mldsa_mode5                                     # -> mldsa mode
+                mldsa_mode3                                     # -> mldsa mode
                 CertParser                                      # -> Certificate parser with OpenSSL support
                 KeyParser                                       # -> Key reader with OpenSSL support
 )

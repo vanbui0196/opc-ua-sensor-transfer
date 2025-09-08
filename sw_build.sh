@@ -1,4 +1,5 @@
 #!/usr/bin/bash
+rm ./server
 rm -rf build
 mkdir build
 
